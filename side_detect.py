@@ -47,28 +47,27 @@ class SmartAgent:
             self.prev_ball_x = ball_x
             return
 
-        # Calculate distances assuming we're on either side
-        right_dist = abs(x - self.prev_ball_x)
-        left_dist = abs(-x - self.prev_ball_x)
-
-        potential_left_hit = left_dist < self.HIT_THRESHOLD
-        potential_right_hit = right_dist < self.HIT_THRESHOLD
+        # Calculate distances for both players
+        our_dist = abs(x - self.prev_ball_x)
+        op_dist = abs(op_x - self.prev_ball_x)
 
         print(f"\nBall hit detected:")
-        print(
-            f"agent_x: {x:.2f}, ball_x: {self.prev_ball_x:.2f}, ball_vx: {self.prev_ball_vx:.2f} -> {ball_vx:.2f}")
-        print(f"dist_if_right: {right_dist:.2f}, dist_if_left: {left_dist:.2f}")
+        print(f"agent_x: {x:.2f}, op_x: {op_x:.2f}, ball_x: {self.prev_ball_x:.2f}")
+        print(f"our_dist: {our_dist:.2f}, op_dist: {op_dist:.2f}")
 
-        if potential_left_hit and not potential_right_hit:
-            self.is_left_side = True
+        # Determine who hit the ball
+        we_hit = our_dist < op_dist and our_dist < self.HIT_THRESHOLD
+
+        if we_hit:
+            # If we hit the ball, our x coordinate tells us our side
+            # If x is near 0, we're left, if x is near 2, we're right
+            self.is_left_side = abs(x) < 1.0
             self.side_detected = True
-            print("DETERMINATION: Left side")
-        elif potential_right_hit and not potential_left_hit:
-            self.is_left_side = False
-            self.side_detected = True
-            print("DETERMINATION: Right side")
+            print(f"DETERMINATION: {'Left' if self.is_left_side else 'Right'} side (our hit)")
+
+        # If opponent hit, don't use it for side detection
         else:
-            print("No clear determination - ambiguous distances")
+            print("Opponent hit - ignoring for side detection")
 
         self.prev_ball_vx = ball_vx
         self.prev_ball_x = ball_x
