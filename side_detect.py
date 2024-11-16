@@ -67,11 +67,11 @@ class SmartAgent:
         print(f"opp_dist to abs(ball_x): {opp_dist:.2f}")
 
         if our_dist < self.HIT_THRESHOLD and opp_dist > self.HIT_THRESHOLD:
-            self.is_left_side = (x < 1.0)  # Left if we're near 0.20, Right if near 2.25
+            self.is_left_side = np.sign(ball_x) != np.sign(x)
             self.side_detected = True
             print(f"DETERMINATION: {'Left' if self.is_left_side else 'Right'} side (our hit)")
         elif our_dist > self.HIT_THRESHOLD and opp_dist < self.HIT_THRESHOLD:
-            self.is_left_side = (x > 1.0)  # Right if we're near 0.20, Left if near 2.25
+            self.is_left_side = np.sign(ball_x) == np.sign(x)
             self.side_detected = True
             print(f"DETERMINATION: {'Left' if self.is_left_side else 'Right'} side (opp hit)")
         else:
