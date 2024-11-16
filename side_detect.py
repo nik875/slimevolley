@@ -8,7 +8,7 @@ class SmartAgent:
         self.reset()
 
         # Constants
-        self.HIT_THRESHOLD = 2.2  # Slightly above ball.r + agent.r (0.5 + 1.5)
+        self.HIT_THRESHOLD = 1  # Slightly above ball.r + agent.r (0.5 + 1.5)
         self.WALL_THRESHOLD = 23  # Just inside the walls at ±24
         self.NET_THRESHOLD = 2    # Width around net to ignore hits
         self.MIN_FRAMES = 3       # Minimum frames to wait before detecting hits
@@ -75,7 +75,7 @@ class SmartAgent:
             self.side_detected = True
             print(f"DETERMINATION: {'Left' if self.is_left_side else 'Right'} side (opp hit)")
         else:
-            print("Opponent hit - ignoring for side detection")
+            print("Ambiguous hit - ignoring for side detection")
 
     def transform_observation(self, obs):
         if not self.is_left_side:
