@@ -12,105 +12,116 @@ class SmartAgent:
         self.WALL_THRESHOLD = 23  # Just inside the walls at ±24
         self.NET_THRESHOLD = 2    # Width around net to ignore hits
 
-        # Track distances over multiple hits to ensure consistency
-        self.hit_distances = []
-        self.MIN_HITS_NEEDED = 3
-
     def reset(self):
         self.network.reset_hidden()
         self.prev_ball_vx = None
         self.prev_ball_x = None
         self.side_detected = False
         self.is_left_side = None
-        self.hit_distances = []
 
     def reset_hidden(self):
         self.reset()
 
     def detect_side(self, obs):
         """
-        Detect which side we're on based on ball hits, accounting for the environment's
-        coordinate system bug where our x is inverted when we're on the left but ball_x isn't.
+        Detect which side we're on based on ball hits, with detailed debugging.
         """
         if self.side_detected:
             return
 
         x, _, _, _, ball_x, _, ball_vx, _, op_x, _, _, _ = obs
 
+        print("\n=== New Frame ===")
+        print(f"Current state:")
+        print(f"x: {x:.2f}, ball_x: {ball_x:.2f}, ball_vx: {ball_vx:.2f}")
+        print(f"prev_ball_x: {self.prev_ball_x if self.prev_ball_x is not None else 'None'}")
+        print(f"prev_ball_vx: {self.prev_ball_vx if self.prev_ball_vx is not None else 'None'}")
+
         # Initialize previous states on first call
         if self.prev_ball_vx is None:
+            print("Initializing previous states")
             self.prev_ball_vx = ball_vx
             self.prev_ball_x = ball_x
             return
 
         # Detect hit by checking for change in ball velocity direction
         velocity_changed_sign = (np.sign(ball_vx) != np.sign(self.prev_ball_vx))
+        print(f"\nHit detection:")
+        print(f"Ball vx changed from {self.prev_ball_vx:.2f} to {ball_vx:.2f}")
+        print(f"Velocity sign changed: {velocity_changed_sign}")
+
         if not velocity_changed_sign:
             self.prev_ball_vx = ball_vx
             self.prev_ball_x = ball_x
+            print("No velocity sign change - updating previous states and returning")
             return
 
-        # Ignore hits near walls
-        if abs(self.prev_ball_x) > self.WALL_THRESHOLD:
+        # Wall hit check
+        near_wall = abs(self.prev_ball_x) > self.WALL_THRESHOLD
+        print(f"\nWall check:")
+        print(f"Ball x position: {self.prev_ball_x:.2f}")
+        print(f"Wall threshold: {self.WALL_THRESHOLD}")
+        print(f"Near wall: {near_wall}")
+
+        if near_wall:
             self.prev_ball_vx = ball_vx
             self.prev_ball_x = ball_x
+            print("Hit was near wall - updating previous states and returning")
             return
 
-        # Ignore hits near net
-        if abs(self.prev_ball_x) < self.NET_THRESHOLD:
+        # Net hit check
+        near_net = abs(self.prev_ball_x) < self.NET_THRESHOLD
+        print(f"\nNet check:")
+        print(f"Ball x position: {self.prev_ball_x:.2f}")
+        print(f"Net threshold: {self.NET_THRESHOLD}")
+        print(f"Near net: {near_net}")
+
+        if near_net:
             self.prev_ball_vx = ball_vx
             self.prev_ball_x = ball_x
+            print("Hit was near net - updating previous states and returning")
             return
 
-        # Calculate both possible distances
+        # Distance calculations
         right_dist = abs(x - self.prev_ball_x)
         left_dist = abs(-x - self.prev_ball_x)
 
-        # Store the distances for analysis
-        self.hit_distances.append((right_dist, left_dist))
+        print(f"\nDistance calculations:")
+        print(f"Agent x: {x:.2f}")
+        print(f"Ball x at hit: {self.prev_ball_x:.2f}")
+        print(f"Distance if on right: {right_dist:.2f}")
+        print(f"Distance if on left: {left_dist:.2f}")
+        print(f"Hit threshold: {self.HIT_THRESHOLD}")
 
-        # Only make determination after seeing enough hits
-        if len(self.hit_distances) >= self.MIN_HITS_NEEDED:
-            # Count hits where right distance is very small (< 0.2)
-            right_side_hits = sum(1 for r, l in self.hit_distances if r < 0.2)
-            # Count hits where left distance is around 2.0-2.2
-            left_side_hits = sum(1 for r, l in self.hit_distances if 2.0 <= l <= 2.2)
+        potential_left_hit = left_dist < self.HIT_THRESHOLD
+        potential_right_hit = right_dist < self.HIT_THRESHOLD
 
-            total_hits = len(self.hit_distances)
+        print(f"\nHit analysis:")
+        print(f"Could be left hit: {potential_left_hit}")
+        print(f"Could be right hit: {potential_right_hit}")
 
-            # Only make determination if pattern is very clear
-            if right_side_hits > total_hits * 0.8:
-                self.is_left_side = True  # Consistent small right_dist means we're on left
-                self.side_detected = True
-                print(
-                    f"Left side confirmed after {total_hits} hits - {right_side_hits} consistent hits")
-            elif left_side_hits > total_hits * 0.8:
-                self.is_left_side = False  # Consistent 2.1ish left_dist means we're on right
-                self.side_detected = True
-                print(
-                    f"Right side confirmed after {total_hits} hits - {left_side_hits} consistent hits")
-
-        # Keep last 10 hits to avoid overflow
-        if len(self.hit_distances) > 10:
-            self.hit_distances = self.hit_distances[-10:]
+        # Make determination
+        if potential_left_hit and not potential_right_hit:
+            self.is_left_side = True
+            self.side_detected = True
+            print("\nDETERMINATION: Left side - only left distance within threshold")
+        elif potential_right_hit and not potential_left_hit:
+            self.is_left_side = False
+            self.side_detected = True
+            print("\nDETERMINATION: Right side - only right distance within threshold")
+        else:
+            print("\nNo clear determination - both or neither distance within threshold")
 
         self.prev_ball_vx = ball_vx
         self.prev_ball_x = ball_x
 
     def transform_observation(self, obs):
-        """
-        Transform the observation by inverting ball coordinates if we're on the left.
-        """
         if not self.is_left_side:
             return obs
 
-        # Create copy to avoid modifying original
         transformed = obs.copy()
-
-        # Invert ball x position and velocity
         transformed[4] *= -1  # ball_x
         transformed[6] *= -1  # ball_vx
-
         return transformed
 
     def forward(self, obs):
