@@ -47,25 +47,20 @@ class SmartAgent:
             self.prev_ball_x = ball_x
             return
 
-        # Calculate distances for both players
-        our_dist = abs(x - self.prev_ball_x)
-        op_dist = abs(op_x - self.prev_ball_x)
+        # Key insight: Our x coordinate is always absolute position
+        # Ball's x coordinate is true (signed) position
+        # When we hit the ball, our x will be close to abs(ball_x)
+        # And our x position (0.20 vs 2.25) tells us which side we're on
+        our_dist = abs(x - abs(self.prev_ball_x))
 
         print(f"\nBall hit detected:")
-        print(f"agent_x: {x:.2f}, op_x: {op_x:.2f}, ball_x: {self.prev_ball_x:.2f}")
-        print(f"our_dist: {our_dist:.2f}, op_dist: {op_dist:.2f}")
+        print(f"agent_x: {x:.2f}, ball_x: {self.prev_ball_x:.2f}")
+        print(f"our_dist to abs(ball_x): {our_dist:.2f}")
 
-        # Determine who hit the ball
-        we_hit = our_dist < op_dist and our_dist < self.HIT_THRESHOLD
-
-        if we_hit:
-            # If we hit the ball, our x coordinate tells us our side
-            # If x is near 0, we're left, if x is near 2, we're right
-            self.is_left_side = abs(x) < 1.0
+        if our_dist < self.HIT_THRESHOLD:
+            self.is_left_side = (x < 1.0)  # Left if we're near 0.20, Right if near 2.25
             self.side_detected = True
             print(f"DETERMINATION: {'Left' if self.is_left_side else 'Right'} side (our hit)")
-
-        # If opponent hit, don't use it for side detection
         else:
             print("Opponent hit - ignoring for side detection")
 
