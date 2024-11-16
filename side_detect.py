@@ -12,12 +12,17 @@ class SmartAgent:
         self.WALL_THRESHOLD = 23  # Just inside the walls at ±24
         self.NET_THRESHOLD = 2    # Width around net to ignore hits
 
+        # Track distances over multiple hits to ensure consistency
+        self.hit_distances = []
+        self.MIN_HITS_NEEDED = 3
+
     def reset(self):
         self.network.reset_hidden()
         self.prev_ball_vx = None
         self.prev_ball_x = None
         self.side_detected = False
         self.is_left_side = None
+        self.hit_distances = []
 
     def reset_hidden(self):
         self.reset()
@@ -57,30 +62,37 @@ class SmartAgent:
             self.prev_ball_x = ball_x
             return
 
-        # Key insight: x is already inverted if we're on the left side!
-        # So we need to try both possibilities and see which makes sense
-
-        # First possibility: we're on right (x is not inverted)
+        # Calculate both possible distances
         right_dist = abs(x - self.prev_ball_x)
-
-        # Second possibility: we're on left (x is inverted)
-        # We need to un-invert x to get true distance
         left_dist = abs(-x - self.prev_ball_x)
 
-        # If we're closer with normal x, we're on right
-        # If we're closer with inverted x, we're on left
-        potential_left_hit = left_dist < self.HIT_THRESHOLD
-        potential_right_hit = right_dist < self.HIT_THRESHOLD
+        # Store the distances for analysis
+        self.hit_distances.append((right_dist, left_dist))
 
-        # Only set side if exactly one distance indicates a hit
-        if potential_left_hit and not potential_right_hit:
-            self.is_left_side = True
-            print(f"Left side hit detected - dist: {left_dist:.2f}")
-            self.side_detected = True
-        elif potential_right_hit and not potential_left_hit:
-            self.is_left_side = False
-            print(f"Right side hit detected - dist: {right_dist:.2f}")
-            self.side_detected = True
+        # Only make determination after seeing enough hits
+        if len(self.hit_distances) >= self.MIN_HITS_NEEDED:
+            # Count hits where right distance is very small (< 0.2)
+            right_side_hits = sum(1 for r, l in self.hit_distances if r < 0.2)
+            # Count hits where left distance is around 2.0-2.2
+            left_side_hits = sum(1 for r, l in self.hit_distances if 2.0 <= l <= 2.2)
+
+            total_hits = len(self.hit_distances)
+
+            # Only make determination if pattern is very clear
+            if right_side_hits > total_hits * 0.8:
+                self.is_left_side = True  # Consistent small right_dist means we're on left
+                self.side_detected = True
+                print(
+                    f"Left side confirmed after {total_hits} hits - {right_side_hits} consistent hits")
+            elif left_side_hits > total_hits * 0.8:
+                self.is_left_side = False  # Consistent 2.1ish left_dist means we're on right
+                self.side_detected = True
+                print(
+                    f"Right side confirmed after {total_hits} hits - {left_side_hits} consistent hits")
+
+        # Keep last 10 hits to avoid overflow
+        if len(self.hit_distances) > 10:
+            self.hit_distances = self.hit_distances[-10:]
 
         self.prev_ball_vx = ball_vx
         self.prev_ball_x = ball_x
