@@ -11,6 +11,7 @@ class SmartAgent:
         self.HIT_THRESHOLD = 2.2  # Slightly above ball.r + agent.r (0.5 + 1.5)
         self.WALL_THRESHOLD = 23  # Just inside the walls at ±24
         self.NET_THRESHOLD = 2    # Width around net to ignore hits
+        self.MIN_FRAMES = 3       # Minimum frames to wait before detecting hits
 
     def reset(self):
         self.network.reset_hidden()
@@ -18,6 +19,7 @@ class SmartAgent:
         self.prev_ball_x = None
         self.side_detected = False
         self.is_left_side = None
+        self.frame_count = 0
 
     def reset_hidden(self):
         self.reset()
@@ -27,9 +29,16 @@ class SmartAgent:
             return
 
         x, _, _, _, ball_x, _, ball_vx, _, op_x, _, _, _ = obs
+        self.frame_count += 1
 
-        # Initialize previous states on first call
+        # Initialize previous states on first frame
         if self.prev_ball_vx is None:
+            self.prev_ball_vx = ball_vx
+            self.prev_ball_x = ball_x
+            return
+
+        # Wait for minimum frames to avoid false initial hit detection
+        if self.frame_count < self.MIN_FRAMES:
             self.prev_ball_vx = ball_vx
             self.prev_ball_x = ball_x
             return
@@ -47,10 +56,7 @@ class SmartAgent:
             self.prev_ball_x = ball_x
             return
 
-        # Key insight: Our x coordinate is always absolute position
-        # Ball's x coordinate is true (signed) position
-        # When we hit the ball, our x will be close to abs(ball_x)
-        # And our x position (0.20 vs 2.25) tells us which side we're on
+        # Compare our position (always positive) to absolute ball position
         our_dist = abs(x - abs(self.prev_ball_x))
 
         print(f"\nBall hit detected:")
